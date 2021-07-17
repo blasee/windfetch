@@ -1,0 +1,33 @@
+Package: windfetch
+Type: Package
+Title: Calculate Wind Fetch
+Version: 0.1.0
+Date: 2021-07-17
+Authors@R: person("Blake", "Seers", role = c("aut", "cre"),
+    email = "blake.seers@gmail.com")
+Imports:
+    methods,
+    dplyr,
+    magrittr,
+    sf,
+    utils,
+    rlang
+URL: https://github.com/blasee/windfetch
+BugReports: https://github.com/blasee/windfetch/issues
+Description: Wind fetch is the unobstructed length of water over which wind can
+    blow from a certain direction. The wind fetch is typically calculated for many directions
+    around the compass rose for a given location, which can then be incorporated 
+    into a larger model, or simply averaged for a reasonable measure of 
+    the overall wind exposure for a specific location. The process of calculating
+    wind fetch can be tedious, particularly if a large
+    number of fetch vectors are required at many locations. The 'windfetch' package
+    calculates wind fetch and summarises the information efficiently. There is
+    also a plot method to help visualise the wind exposure at the various
+    locations, and it's easy to write out to a shape file for further investigation.
+License: MIT + file LICENSE
+Encoding: UTF-8
+RoxygenNote: 7.1.1
+Collate: 
+    'internals.R'
+    'windfetch_class.R'
+    'windfetch.R'

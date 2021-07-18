@@ -269,7 +269,7 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
                      st_sfc(st_point(c(as.numeric(x['X0']), as.numeric(x['Y0']))))
                    }), st_sfc), crs = st_crs(polygon_layer)))
 
-  poly_subset = polygon_layer[lengths(st_intersects(polygon_layer, fetch_df)) > 0, ]
+  poly_subset = polygon_layer[lengths(st_intersects(polygon_layer, fetch_df)) > 0]
 
   # Create an empty vector to store the fetch linestrings
   fetch = NA

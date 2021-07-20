@@ -3,7 +3,7 @@
 #' @importFrom sf st_intersection st_cast st_nearest_points st_nearest_feature
 
 return_fetch_vector = function(vector, origin, polygon) {
-  fetch_on_land = st_intersection(vector, polygon)
+  fetch_on_land = suppressWarnings(st_intersection(vector, polygon))
 
   if (nrow(fetch_on_land) == 0) {
     fetch = vector

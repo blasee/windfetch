@@ -19,6 +19,11 @@
 #' or equivalently, one fetch vector every 10 degrees. The first fetch vector is
 #' always calculated for the northerly direction (0/360 degrees).
 #'
+#' The site names are taken from a column of the data associated with
+#' \code{site_layer} matching the regular expression \code{^[Nn]ames{0,1}}. If
+#' there is no such column, then default names are created ('Site 1', 'Site 2',
+#' ...).
+#'
 #' @param polygon_layer \code{\link[sf]{sf}} polygon object where the
 #'                      polygon geometries represent any obstructions to fetch
 #'                      calculations including the coastline, islands and/or
@@ -30,11 +35,6 @@
 #'                 not 'm'.
 #' @param n_directions numeric. The number of fetch vectors to calculate per
 #'                     quadrant (default 9).
-#' @param site_names character vector of the site names. If missing, the site
-#'                   names are taken from a column of the data associated with
-#'                   \code{site_layer} matching the regular expression
-#'                   \code{^[Nn]ames{0,1}}. If there is no such column, then
-#'                   default names are created ('Site 1', 'Site 2', ...).
 #' @param quiet logical. Suppress diagnostic messages? (Default \code{FALSE}).
 #' @param progress_bar logical. Show a text progress bar? (Default \code{TRUE})
 #'
@@ -134,7 +134,7 @@
 #' }
 #' @export
 windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9,
-                 site_names, quiet = FALSE, progress_bar = TRUE) {
+                     quiet = FALSE, progress_bar = TRUE) {
 
   if (!any(is(polygon_layer, "sf"), is(polygon_layer, "sfc")))
     stop(paste("polygon_layer must be either an sf or sfc object.\nSee",
@@ -160,12 +160,6 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
 
   if (n_directions < 1 || n_directions > 90)
     stop("n_directions must be between 1 and 90.", call. = FALSE)
-
-  if (!missing(site_names))
-    warning(paste("Argument site_names is deprecated; please incorporate the",
-                  "site names into the site_layer dataframe instead.\nSee",
-                  "`?fetch` for an example on how to do this."),
-            call. = FALSE)
 
   quiet = as.logical(quiet[[1]])
 
@@ -249,7 +243,7 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
 
   fetch_locs_df = as.data.frame(st_coordinates(site_layer))
   colnames(fetch_locs_df) = c("X0", "Y0")
-  fetch_locs_df$site_names = site_layer[[2]]
+  fetch_locs_df$site_names = site_names
 
   fetch_df = unique(left_join(fetch_ends_df, fetch_locs_df, by = "site_names"))
   fetch_df$directions = c(head(seq(90, 360, by = 360 / (n_directions * 4)), -1),
@@ -269,10 +263,7 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
                      st_sfc(st_point(c(as.numeric(x['X0']), as.numeric(x['Y0']))))
                    }), st_sfc), crs = st_crs(polygon_layer)))
 
-  poly_subset = polygon_layer[lengths(st_intersects(polygon_layer, fetch_df)) > 0]
-
-  # Create an empty vector to store the fetch linestrings
-  fetch = NA
+  poly_subset = subset(polygon_layer, lengths(st_intersects(polygon_layer, fetch_df)) > 0)
 
   if (progress_bar)
     pb = txtProgressBar(max = nrow(fetch_df), style = 3)

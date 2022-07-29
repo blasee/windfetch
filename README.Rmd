@@ -132,4 +132,4 @@ example(windfetch)
 
 # Citation
 
-Please refer to the [Data Access Portal entry at CSIRO](http://hdl.handle.net/102.100.100/421787?index=1) for the citation.
+Please refer to the [Data Access Portal entry at CSIRO](https://doi.org/10.25919/5c84-m977) for the citation.

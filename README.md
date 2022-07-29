@@ -38,7 +38,7 @@ remotes::install_github("blasee/windfetch")
 # Load the windfetch and sf package
 library(windfetch)
 library(sf)
-#> Linking to GEOS 3.9.0, GDAL 3.2.1, PROJ 7.2.1
+#> Linking to GEOS 3.8.0, GDAL 3.0.4, PROJ 6.3.1; sf_use_s2() is TRUE
 
 # Read a shapefile of the North Carolina coastline
 nc = st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
@@ -84,22 +84,22 @@ my_fetch_proj = windfetch(nc_proj, sites_points_proj, progress_bar = FALSE)
 #> checking site locations are not on land
 
 summary(my_fetch_proj)
-#> # A tibble: 12 x 3
+#> # A tibble: 12 × 3
 #> # Groups:   site_name [3]
 #>    site_name quadrant avg_fetch
 #>    <chr>     <fct>          [m]
-#>  1 Site 1    North        25128
-#>  2 Site 1    East         24890
-#>  3 Site 1    South        14726
-#>  4 Site 1    West         26470
-#>  5 Site 2    North        27791
-#>  6 Site 2    East         39171
-#>  7 Site 2    South        90781
-#>  8 Site 2    West         51566
-#>  9 Site 3    North        12844
-#> 10 Site 3    East        192873
+#>  1 Site 1    North        23283
+#>  2 Site 1    East         24894
+#>  3 Site 1    South        14719
+#>  4 Site 1    West         25129
+#>  5 Site 2    North        27798
+#>  6 Site 2    East         39169
+#>  7 Site 2    South        90776
+#>  8 Site 2    West         45870
+#>  9 Site 3    North        12849
+#> 10 Site 3    East        192876
 #> 11 Site 3    South       300000
-#> 12 Site 3    West         24552
+#> 12 Site 3    West         24556
 ```
 
 The `my_fetch_proj` object provides a summary of the fetch for all the
@@ -140,20 +140,20 @@ my_fetch_sf
 #> Simple feature collection with 108 features and 4 fields
 #> Geometry type: LINESTRING
 #> Dimension:     XY
-#> Bounding box:  xmin: -79.39009 ymin: 31.79712 xmax: -74.03681 ymax: 36.30496
+#> Bounding box:  xmin: -79.39009 ymin: 31.79712 xmax: -74.03681 ymax: 36.26015
 #> Geodetic CRS:  WGS 84
 #> First 10 features:
 #>    site_name directions quadrant        fetch                       geometry
-#> 1     Site 1          0    North 19840.17 [m] LINESTRING (-76 36, -75.993...
-#> 2     Site 1         10    North 28585.04 [m] LINESTRING (-76 36, -75.935...
-#> 3     Site 1         20    North 24826.65 [m] LINESTRING (-76 36, -75.897...
-#> 4     Site 1         30    North 20914.99 [m] LINESTRING (-76 36, -75.877...
-#> 5     Site 1         40    North 18555.24 [m] LINESTRING (-76 36, -75.862...
-#> 6     Site 1         50     East 17860.90 [m] LINESTRING (-76 36, -75.844...
-#> 7     Site 1         60     East 19110.89 [m] LINESTRING (-76 36, -75.813...
-#> 8     Site 1         70     East 24209.81 [m] LINESTRING (-76 36, -75.744...
-#> 9     Site 1         80     East 27884.69 [m] LINESTRING (-76 36, -75.693...
-#> 10    Site 1         90     East 30045.36 [m] LINESTRING (-76 36, -75.666...
+#> 1     Site 1          0    North 19850.17 [m] LINESTRING (-76 36, -75.993...
+#> 2     Site 1         10    North 28594.44 [m] LINESTRING (-76 36, -75.935...
+#> 3     Site 1         20    North 24833.20 [m] LINESTRING (-76 36, -75.897...
+#> 4     Site 1         30    North 20920.73 [m] LINESTRING (-76 36, -75.877...
+#> 5     Site 1         40    North 18560.48 [m] LINESTRING (-76 36, -75.862...
+#> 6     Site 1         50     East 17869.99 [m] LINESTRING (-76 36, -75.844...
+#> 7     Site 1         60     East 19120.77 [m] LINESTRING (-76 36, -75.813...
+#> 8     Site 1         70     East 24213.79 [m] LINESTRING (-76 36, -75.744...
+#> 9     Site 1         80     East 27891.44 [m] LINESTRING (-76 36, -75.693...
+#> 10    Site 1         90     East 30052.82 [m] LINESTRING (-76 36, -75.666...
 ```
 
 ``` r
@@ -177,5 +177,4 @@ example(windfetch)
 # Citation
 
 Please refer to the [Data Access Portal entry at
-CSIRO](http://hdl.handle.net/102.100.100/421787?index=1) for the
-citation.
+CSIRO](https://doi.org/10.25919/5c84-m977) for the citation.

@@ -55,7 +55,7 @@
 #' @importFrom methods new is
 #' @importFrom sf st_is st_is_longlat st_crs st_transform st_intersects
 #'                st_buffer st_coordinates st_sf st_sfc st_linestring st_point
-#'                st_length st_geometry<-
+#'                st_length st_geometry<- st_as_sf
 #' @importFrom dplyr left_join
 #' @include windfetch_class.R
 #' @examples
@@ -201,6 +201,10 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
     warning(paste("Removing the", sum(sites_on_land), "points on land."),
             call. = FALSE)
     site_layer = site_layer[!sites_on_land, ]
+  }
+  
+  if (!is.data.frame(site_layer)) {
+    site_layer = st_as_sf(site_layer)
   }
 
   if (any(grepl("^[Nn]ames{0,1}$", names(site_layer)))){

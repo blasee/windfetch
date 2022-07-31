@@ -1,8 +1,8 @@
 Package: windfetch
 Type: Package
 Title: Calculate Wind Fetch
-Version: 0.1.0
-Date: 2021-07-17
+Version: 0.1.1
+Date: 2022-07-31
 Authors@R: person("Blake", "Seers", role = c("aut", "cre"),
     email = "blake.seers@gmail.com")
 Imports:
@@ -26,7 +26,7 @@ Description: Wind fetch is the unobstructed length of water over which wind can
     locations, and it's easy to write out to a shape file for further investigation.
 License: MIT + file LICENSE
 Encoding: UTF-8
-RoxygenNote: 7.1.1
+RoxygenNote: 7.2.1
 Collate: 
     'internals.R'
     'windfetch_class.R'

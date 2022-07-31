@@ -10,7 +10,6 @@ windfetch(
   site_layer,
   max_dist = 300,
   n_directions = 9,
-  site_names,
   quiet = FALSE,
   progress_bar = TRUE
 )
@@ -30,12 +29,6 @@ not 'm'.}
 
 \item{n_directions}{numeric. The number of fetch vectors to calculate per
 quadrant (default 9).}
-
-\item{site_names}{character vector of the site names. If missing, the site
-names are taken from a column of the data associated with
-\code{site_layer} matching the regular expression
-\code{^[Nn]ames{0,1}}. If there is no such column, then
-default names are created ('Site 1', 'Site 2', ...).}
 
 \item{quiet}{logical. Suppress diagnostic messages? (Default \code{FALSE}).}
 
@@ -83,6 +76,11 @@ determined by the number of directions per quadrant (\code{n_directions}).
 The default value of 9 calculates 9 fetch vectors per quadrant (90 degrees),
 or equivalently, one fetch vector every 10 degrees. The first fetch vector is
 always calculated for the northerly direction (0/360 degrees).
+
+The site names are taken from a column of the data associated with
+\code{site_layer} matching the regular expression \code{^[Nn]ames{0,1}}. If
+there is no such column, then default names are created ('Site 1', 'Site 2',
+...).
 }
 \note{
 At least one of the inputs to the \code{polygon_layer} or

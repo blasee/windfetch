@@ -280,6 +280,7 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
     if (progress_bar)
       setTxtProgressBar(pb, i)
   }
+  cat("\n")
 
   fetch_df$fetch = st_sfc(lapply(fetch_df$fetch, `[[`, 1),
                           crs = st_crs(polygon_layer))

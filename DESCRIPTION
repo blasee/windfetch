@@ -11,7 +11,10 @@ Imports:
     magrittr,
     sf,
     utils,
-    rlang
+    rlang,
+    foreach,
+    doParallel, 
+    parallel
 URL: https://github.com/blasee/windfetch
 BugReports: https://github.com/blasee/windfetch/issues
 Description: Wind fetch is the unobstructed length of water over which wind can

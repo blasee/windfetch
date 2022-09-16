@@ -37,6 +37,7 @@
 #'                     quadrant (default 9).
 #' @param quiet logical. Suppress diagnostic messages? (Default \code{FALSE}).
 #' @param progress_bar logical. Show a text progress bar? (Default \code{TRUE})
+#' @param ncores numeric. The number of cores on ones computer to use for parallel processing backend. Default is 2.
 #'
 #' @return Returns a \code{\link{WindFetch}} object.
 #'
@@ -53,16 +54,25 @@
 #'
 #' @importFrom utils head txtProgressBar setTxtProgressBar
 #' @importFrom methods new is
-#' @importFrom sf st_is st_is_longlat st_crs st_transform st_intersects
+#' @importFrom sf st_is st_is_longlat st_crs st_transform st_intersects st_as_sf
 #'                st_buffer st_coordinates st_sf st_sfc st_linestring st_point
 #'                st_length st_geometry<- st_as_sf
-#' @importFrom dplyr left_join
+#' @importFrom dplyr left_join mutate relocate
+#' @importFrom stats setNames
+#' @importFrom parallel detectCores makeCluster stopCluster
+#' @importFrom doParallel registerDoParallel
+#' @importFrom foreach foreach
+#'
 #' @include windfetch_class.R
 #' @examples
 #'
 #' # Create the polygon layer ----------------------------------------
 #'
 #' library(sf)
+#' library(doParallel)
+#' library(parallel)
+#' library(foreach)
+#' library(dplyr)
 #'
 #' # Read in North Carolina shape file
 #' nc = st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
@@ -133,8 +143,15 @@
 #' st_write(nc_fetch_sf, "nc_fetch.shp", driver = "ESRI Shapefile")
 #' }
 #' @export
-windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9,
-                     quiet = FALSE, progress_bar = TRUE) {
+windfetch <- function(
+    polygon_layer,
+    site_layer,
+    max_dist      = 300,
+    n_directions  = 9,
+    quiet         = FALSE,
+    progress_bar  = TRUE,
+    ncores        = 2
+    ) {
 
   if (!any(is(polygon_layer, "sf"), is(polygon_layer, "sfc")))
     stop(paste("polygon_layer must be either an sf or sfc object.\nSee",
@@ -202,7 +219,7 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
             call. = FALSE)
     site_layer = site_layer[!sites_on_land, ]
   }
-  
+
   if (!is.data.frame(site_layer)) {
     site_layer = st_as_sf(site_layer)
   }
@@ -269,28 +286,54 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
 
   poly_subset = subset(polygon_layer, lengths(st_intersects(polygon_layer, fetch_df)) > 0)
 
-  if (progress_bar)
-    pb = txtProgressBar(max = nrow(fetch_df), style = 3)
+  # detect system cores
+  # cores <- parallel::detectCores()
 
-  for (i in 1:nrow(fetch_df)) {
-    fetch_df$fetch[i] = as.data.frame(
-      return_fetch_vector(fetch_df[i, "geom"],
-                          fetch_df$origin[i],
-                          poly_subset))
-    if (progress_bar)
-      setTxtProgressBar(pb, i)
-  }
-  cat("\n")
+  # make a cluster
+  cl    <- parallel::makeCluster(ncores) #not to overload your computer
 
-  fetch_df$fetch = st_sfc(lapply(fetch_df$fetch, `[[`, 1),
-                          crs = st_crs(polygon_layer))
+  # register parallel backend
+  doParallel::registerDoParallel(cl)
 
-  st_geometry(fetch_df) = fetch_df$fetch
-  fetch_df = fetch_df[, 1:2]
-  fetch_df$quadrant = factor(quadrant,
-                             levels = c("North", "East", "South", "West"))
-  fetch_df$fetch = st_length(fetch_df$geom)
+  # run a loop using a parallel backend. ~2x faster
+  fetch_loop <- foreach::foreach(i = 1:nrow(fetch_df),
+    .combine  = "rbind",
+    .export   = c('return_fetch_vector'),
+    .packages = c("dplyr", "sf", "stats")) %dopar% {
 
-  new("WindFetch", fetch_df, names = site_names, max_dist = max_dist / 1000)
+      fetch_calc <- return_fetch_vector(
+                      vector  = fetch_df[i, "geom"],
+                      origin  = fetch_df$origin[i],
+                      polygon = poly_subset
+                      ) %>%
+        as.data.frame()  %>%
+        stats::setNames(c("geometry")) %>%
+        dplyr::mutate(
+          site_names = fetch_df$site_names[i],
+          directions = fetch_df$directions[i]
+        ) %>%
+        dplyr::relocate(site_names, directions)
+
+      fetch_calc
+    }
+
+  # stop extra workers
+  doParallel::stopImplicitCluster()
+  parallel::stopCluster(cl)
+
+  # convert linestring dataframe to sf dataframe
+  final_fetch <-
+    fetch_loop %>%
+    sf::st_as_sf() %>%
+    sf::st_transform(sf::st_crs(polygon_layer))
+
+  # add quadrant factor column
+  final_fetch$quadrant <- factor(quadrant, levels = c("North", "East", "South", "West"))
+
+  # add length of fetch linestring
+  final_fetch$fetch    <- sf::st_length(final_fetch$geometry)
+
+  # make the "WindFetch" object
+  new("WindFetch", final_fetch, names = site_names, max_dist = max_dist / 1000)
 }
 

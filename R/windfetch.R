@@ -37,6 +37,7 @@
 #'                     quadrant (default 9).
 #' @param quiet logical. Suppress diagnostic messages? (Default \code{FALSE}).
 #' @param progress_bar logical. Show a text progress bar? (Default \code{TRUE})
+#' @param as_sf logical. Should an SF object be returned on only the fetch distances. Default is TRUE, returns SF object
 #' @param ncores numeric. The number of cores on ones computer to use for parallel processing backend. Default is 2.
 #'
 #' @return Returns a \code{\link{WindFetch}} object.
@@ -55,7 +56,7 @@
 #' @importFrom utils head txtProgressBar setTxtProgressBar
 #' @importFrom methods new is
 #' @importFrom sf st_is st_is_longlat st_crs st_transform st_intersects st_as_sf
-#'                st_buffer st_coordinates st_sf st_sfc st_linestring st_point
+#'                st_buffer st_coordinates st_sf st_sfc st_linestring st_point st_drop_geometry
 #'                st_length st_geometry<- st_as_sf
 #' @importFrom dplyr left_join mutate relocate
 #' @importFrom stats setNames
@@ -150,9 +151,11 @@ windfetch <- function(
     n_directions  = 9,
     quiet         = FALSE,
     progress_bar  = TRUE,
+    as_sf         = TRUE,
     ncores        = 2
     ) {
-
+  # polygon_layer <- nc_proj
+  # site_layer <- sites_points
   if (!any(is(polygon_layer, "sf"), is(polygon_layer, "sfc")))
     stop(paste("polygon_layer must be either an sf or sfc object.\nSee",
                "`?read_sf` for details on how to read in an",
@@ -273,21 +276,27 @@ windfetch <- function(
 
 
   fetch_df = st_sf(fetch_df[, c("site_names", "directions")],
-                   geom = st_sfc(sapply(apply(fetch_df, 1, function(x) {
-                     X0 = as.numeric(x['X0'])
-                     Y0 = as.numeric(x['Y0'])
-                     X = as.numeric(x['X'])
-                     Y = as.numeric(x['Y'])
-                     st_sfc(st_linestring(matrix(c(X0, X, Y0, Y), 2, 2), dim = "XY"))
-                   }), st_sfc), crs = st_crs(polygon_layer)),
-                   origin = st_sfc(sapply(apply(fetch_df, 1, function(x) {
+                   geom = st_sfc(
+                     sapply(
+                       apply(fetch_df, 1, function(x) {
+                           X0 = as.numeric(x['X0'])
+                           Y0 = as.numeric(x['Y0'])
+                           X  = as.numeric(x['X'])
+                           Y  = as.numeric(x['Y'])
+                     st_sfc(
+                       st_linestring(matrix(c(X0, X, Y0, Y), 2, 2), dim = "XY")
+                       )
+                   }),
+                   st_sfc
+                   ),
+                   crs = st_crs(polygon_layer)
+                   ),
+                   origin = st_sfc(
+                     sapply(apply(fetch_df, 1, function(x) {
                      st_sfc(st_point(c(as.numeric(x['X0']), as.numeric(x['Y0']))))
                    }), st_sfc), crs = st_crs(polygon_layer)))
 
   poly_subset = subset(polygon_layer, lengths(st_intersects(polygon_layer, fetch_df)) > 0)
-
-  # detect system cores
-  # cores <- parallel::detectCores()
 
   # make a cluster
   cl    <- parallel::makeCluster(ncores) #not to overload your computer
@@ -333,7 +342,23 @@ windfetch <- function(
   # add length of fetch linestring
   final_fetch$fetch    <- sf::st_length(final_fetch$geometry)
 
-  # make the "WindFetch" object
-  new("WindFetch", final_fetch, names = site_names, max_dist = max_dist / 1000)
+  # if no SF object is desired, just return fetch distances
+  if(as_sf == TRUE) {
+
+    # make the "WindFetch" object
+    return(new("WindFetch", final_fetch, names = site_names, max_dist = max_dist / 1000))
+
+  } else {
+
+    # return only distances, no sf object
+    final_fetch <-
+      final_fetch %>%
+      sf::st_drop_geometry()
+
+    return(final_fetch)
+
+  }
+
+
 }
 

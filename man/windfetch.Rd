@@ -12,6 +12,7 @@ windfetch(
   n_directions = 9,
   quiet = FALSE,
   progress_bar = TRUE,
+  as_sf = TRUE,
   ncores = 2
 )
 }
@@ -34,6 +35,8 @@ quadrant (default 9).}
 \item{quiet}{logical. Suppress diagnostic messages? (Default \code{FALSE}).}
 
 \item{progress_bar}{logical. Show a text progress bar? (Default \code{TRUE})}
+
+\item{as_sf}{logical. Should an SF object be returned on only the fetch distances. Default is TRUE, returns SF object}
 
 \item{ncores}{numeric. The number of cores on ones computer to use for parallel processing backend. Default is 2.}
 }

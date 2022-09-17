@@ -37,6 +37,8 @@
 #'                     quadrant (default 9).
 #' @param quiet logical. Suppress diagnostic messages? (Default \code{FALSE}).
 #' @param progress_bar logical. Show a text progress bar? (Default \code{TRUE})
+#' @param as_sf logical. Should an SF object be returned on only the fetch distances. Default is TRUE, returns SF object
+#' @param ncores numeric. The number of cores on ones computer to use for parallel processing backend. Default is 2.
 #'
 #' @return Returns a \code{\link{WindFetch}} object.
 #'
@@ -53,16 +55,25 @@
 #'
 #' @importFrom utils head txtProgressBar setTxtProgressBar
 #' @importFrom methods new is
-#' @importFrom sf st_is st_is_longlat st_crs st_transform st_intersects
-#'                st_buffer st_coordinates st_sf st_sfc st_linestring st_point
+#' @importFrom sf st_is st_is_longlat st_crs st_transform st_intersects st_as_sf
+#'                st_buffer st_coordinates st_sf st_sfc st_linestring st_point st_drop_geometry
 #'                st_length st_geometry<- st_as_sf
-#' @importFrom dplyr left_join
+#' @importFrom dplyr left_join mutate relocate
+#' @importFrom stats setNames
+#' @importFrom parallel detectCores makeCluster stopCluster
+#' @importFrom doParallel registerDoParallel
+#' @importFrom foreach foreach
+#'
 #' @include windfetch_class.R
 #' @examples
 #'
 #' # Create the polygon layer ----------------------------------------
 #'
 #' library(sf)
+#' library(doParallel)
+#' library(parallel)
+#' library(foreach)
+#' library(dplyr)
 #'
 #' # Read in North Carolina shape file
 #' nc = st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
@@ -133,9 +144,16 @@
 #' st_write(nc_fetch_sf, "nc_fetch.shp", driver = "ESRI Shapefile")
 #' }
 #' @export
-windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9,
-                     quiet = FALSE, progress_bar = TRUE) {
-
+windfetch <- function(
+    polygon_layer,
+    site_layer,
+    max_dist      = 300,
+    n_directions  = 9,
+    quiet         = FALSE,
+    progress_bar  = TRUE,
+    as_sf         = TRUE,
+    ncores        = 2
+    ) {
   if (!any(is(polygon_layer, "sf"), is(polygon_layer, "sfc")))
     stop(paste("polygon_layer must be either an sf or sfc object.\nSee",
                "`?read_sf` for details on how to read in an",
@@ -154,8 +172,11 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
   if (!is.numeric(max_dist) || length(max_dist) != 1)
     stop("max_dist must be a single number.", call. = FALSE)
 
-  if (!is.numeric(n_directions) || length(n_directions) != 1)
+  if (!is.numeric(n_directions) || length(n_directions) != 1) {
+
     stop("n_directions must be a single integer.", call. = FALSE)
+
+  }
   n_directions = round(n_directions)
 
   if (n_directions < 1 || n_directions > 90)
@@ -168,32 +189,42 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
 
   which_proj = c(!st_is_longlat(polygon_layer), !st_is_longlat(site_layer))
 
-  if (all(!which_proj))
+  if (all(!which_proj)) {
+
     stop("The polygon_layer or site_layer argument must be projected to calculate fetch.",
          call. = FALSE)
 
-  if (all(which_proj) && !(st_crs(site_layer) == st_crs(polygon_layer))){
+  }
+
+  if (all(which_proj) && !(st_crs(site_layer) == st_crs(polygon_layer))) {
     warning(paste("The CRS for the polygon_layer and site_layer arguments",
                   "differ; transforming site_layer CRS to match."),
             call. = FALSE)
 
     site_layer = st_transform(site_layer, st_crs(polygon_layer))
+
   }
 
   if (!which_proj[1]){
-    if (!quiet)
+    if (!quiet) {
+
       message("projecting polygon_layer onto the site_layer CRS")
+
+    }
     polygon_layer = st_transform(polygon_layer, st_crs(site_layer))
   }
 
   if (!which_proj[2]){
-    if (!quiet)
+
+    if (!quiet) {
       message("projecting site_layer onto the polygon_layer CRS")
+    }
     site_layer = st_transform(site_layer, st_crs(polygon_layer))
   }
 
-  if (!quiet)
+  if (!quiet) {
     message("checking site locations are not on land")
+  }
 
   sites_on_land = st_intersects(site_layer, polygon_layer, sparse = FALSE)[, 1]
 
@@ -202,18 +233,27 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
             call. = FALSE)
     site_layer = site_layer[!sites_on_land, ]
   }
-  
+
+  # convert dataframes to SF
   if (!is.data.frame(site_layer)) {
+
     site_layer = st_as_sf(site_layer)
+
   }
 
+  # name sites
   if (any(grepl("^[Nn]ames{0,1}$", names(site_layer)))){
-    name_col = grep("^[Nn]ames{0,1}$", names(site_layer))
-    site_names = as.character(site_layer[[name_col]])
-  } else {
-    site_names = paste("Site", seq_len(dim(site_layer)[[1]]))
-  }
+    message("name section1")
+    name_col   = grep("^[Nn]ames{0,1}$", names(site_layer))
 
+    site_names = as.character(site_layer[[name_col]])
+
+  } else {
+    message("name section2")
+    site_names = paste("Site", seq_len(dim(site_layer)[[1]]))
+
+  }
+  message("name section3")
   site_layer$site_names = site_names
 
   # Convert max_dist to appropriate units.
@@ -223,12 +263,18 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
   # Double check if metres are the correct units, and warn otherwise.
   proj_unit = st_crs(polygon_layer)$units
 
-  if (proj_unit != "m")
+  if (proj_unit != "m") {
+
     warning(paste("The CRS unit is not metres; ensure that the max_dist argument",
                   "has been scaled appropriately."), call. = FALSE)
 
+  }
+
+  message("dir section1")
   directions = head(seq(0, 360, by = 360 / (n_directions * 4)), -1)
 
+
+  message("dir section2")
   # Return the quadrant the directions belong to
   dirs = as.numeric(directions)
   dirs_bin = findInterval(dirs, seq(45, 315, by = 90))
@@ -237,16 +283,24 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
   quadrant[dirs_bin == 2] = "South"
   quadrant[dirs_bin == 3] = "West"
 
+  message("dir section3")
+
   # Rearrange sequence order to start at 90 degrees
   directions = unlist(split(directions, directions < 90), use.names = FALSE)
 
   fetch_ends = st_buffer(site_layer, max_dist, n_directions)
   fetch_ends_df = as.data.frame(st_coordinates(fetch_ends))
 
+  message("name section4")
+
   fetch_ends_df$site_names = site_names[fetch_ends_df[, 4]]
 
   fetch_locs_df = as.data.frame(st_coordinates(site_layer))
+
   colnames(fetch_locs_df) = c("X0", "Y0")
+
+  message("name section5")
+
   fetch_locs_df$site_names = site_names
 
   fetch_df = unique(left_join(fetch_ends_df, fetch_locs_df, by = "site_names"))
@@ -254,43 +308,96 @@ windfetch = function(polygon_layer, site_layer, max_dist = 300, n_directions = 9
                           head(seq(0, 90, by = 360 / (n_directions * 4)), -1))
   fetch_df = fetch_df[with(fetch_df, order(site_names, directions)), ]
 
-
+  message("nested section")
   fetch_df = st_sf(fetch_df[, c("site_names", "directions")],
-                   geom = st_sfc(sapply(apply(fetch_df, 1, function(x) {
-                     X0 = as.numeric(x['X0'])
-                     Y0 = as.numeric(x['Y0'])
-                     X = as.numeric(x['X'])
-                     Y = as.numeric(x['Y'])
-                     st_sfc(st_linestring(matrix(c(X0, X, Y0, Y), 2, 2), dim = "XY"))
-                   }), st_sfc), crs = st_crs(polygon_layer)),
-                   origin = st_sfc(sapply(apply(fetch_df, 1, function(x) {
+                   geom = st_sfc(
+                     sapply(
+                       apply(fetch_df, 1, function(x) {
+                           X0 = as.numeric(x['X0'])
+                           Y0 = as.numeric(x['Y0'])
+                           X  = as.numeric(x['X'])
+                           Y  = as.numeric(x['Y'])
+                     st_sfc(
+                       st_linestring(matrix(c(X0, X, Y0, Y), 2, 2), dim = "XY")
+                       )
+                   }),
+                   st_sfc
+                   ),
+                   crs = st_crs(polygon_layer)
+                   ),
+                   origin = st_sfc(
+                     sapply(apply(fetch_df, 1, function(x) {
                      st_sfc(st_point(c(as.numeric(x['X0']), as.numeric(x['Y0']))))
                    }), st_sfc), crs = st_crs(polygon_layer)))
 
+  message("Subset section")
+
   poly_subset = subset(polygon_layer, lengths(st_intersects(polygon_layer, fetch_df)) > 0)
+  message("parralel")
+  # make a cluster
+  cl    <- parallel::makeCluster(ncores) #not to overload your computer
 
-  if (progress_bar)
-    pb = txtProgressBar(max = nrow(fetch_df), style = 3)
+  # register parallel backend
+  doParallel::registerDoParallel(cl)
 
-  for (i in 1:nrow(fetch_df)) {
-    fetch_df$fetch[i] = as.data.frame(
-      return_fetch_vector(fetch_df[i, "geom"],
-                          fetch_df$origin[i],
-                          poly_subset))
-    if (progress_bar)
-      setTxtProgressBar(pb, i)
+  # run a loop using a parallel backend. ~2x faster
+  fetch_loop <- foreach::foreach(i = 1:nrow(fetch_df),
+    .combine  = "rbind",
+    .export   = c('return_fetch_vector'),
+    .packages = c("dplyr", "sf", "stats")) %dopar% {
+
+      fetch_calc <- return_fetch_vector(
+                      vector  = fetch_df[i, "geom"],
+                      origin  = fetch_df$origin[i],
+                      polygon = poly_subset
+                      ) %>%
+        as.data.frame()  %>%
+        stats::setNames(c("geometry")) %>%
+        dplyr::mutate(
+          site_names = fetch_df$site_names[i],
+          directions = fetch_df$directions[i]
+        ) %>%
+        dplyr::relocate(site_names, directions)
+
+      fetch_calc
+    }
+
+  # stop extra workers
+  doParallel::stopImplicitCluster()
+  parallel::stopCluster(cl)
+
+  # convert linestring dataframe to sf dataframe
+  final_fetch <-
+    fetch_loop %>%
+    sf::st_as_sf() %>%
+    sf::st_transform(sf::st_crs(polygon_layer))
+
+  message("quadrant add")
+
+  # add quadrant factor column
+  final_fetch$quadrant <- factor(quadrant, levels = c("North", "East", "South", "West"))
+
+  # add length of fetch linestring
+  final_fetch$fetch    <- sf::st_length(final_fetch$geometry)
+
+  # if no SF object is desired, just return fetch distances
+  if(as_sf == TRUE) {
+    message("new part")
+    # make the "WindFetch" object
+    return(new("WindFetch", final_fetch, names = site_names, max_dist = max_dist / 1000))
+
+  } else {
+
+    message("no new part")
+    # return only distances, no sf object
+    final_fetch <-
+      final_fetch %>%
+      sf::st_drop_geometry()
+
+    return(final_fetch)
+
   }
-  cat("\n")
 
-  fetch_df$fetch = st_sfc(lapply(fetch_df$fetch, `[[`, 1),
-                          crs = st_crs(polygon_layer))
 
-  st_geometry(fetch_df) = fetch_df$fetch
-  fetch_df = fetch_df[, 1:2]
-  fetch_df$quadrant = factor(quadrant,
-                             levels = c("North", "East", "South", "West"))
-  fetch_df$fetch = st_length(fetch_df$geom)
-
-  new("WindFetch", fetch_df, names = site_names, max_dist = max_dist / 1000)
 }
 

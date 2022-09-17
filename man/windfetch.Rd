@@ -11,7 +11,9 @@ windfetch(
   max_dist = 300,
   n_directions = 9,
   quiet = FALSE,
-  progress_bar = TRUE
+  progress_bar = TRUE,
+  as_sf = TRUE,
+  ncores = 2
 )
 }
 \arguments{
@@ -33,6 +35,10 @@ quadrant (default 9).}
 \item{quiet}{logical. Suppress diagnostic messages? (Default \code{FALSE}).}
 
 \item{progress_bar}{logical. Show a text progress bar? (Default \code{TRUE})}
+
+\item{as_sf}{logical. Should an SF object be returned on only the fetch distances. Default is TRUE, returns SF object}
+
+\item{ncores}{numeric. The number of cores on ones computer to use for parallel processing backend. Default is 2.}
 }
 \value{
 Returns a \code{\link{WindFetch}} object.
@@ -95,6 +101,10 @@ At least one of the inputs to the \code{polygon_layer} or
 # Create the polygon layer ----------------------------------------
 
 library(sf)
+library(doParallel)
+library(parallel)
+library(foreach)
+library(dplyr)
 
 # Read in North Carolina shape file
 nc = st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
